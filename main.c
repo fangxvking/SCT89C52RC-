@@ -1,5 +1,6 @@
 /*
 本程序由德克萨斯监督运行！
+https://github.com/fangxvking/SCT89C52RC-
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -55,13 +56,15 @@
 
 
 
+
+
 #include<reg52.h>
 
 #define uchar unsigned char
 #define uint  unsigned int 
-#define n  0x40
+#define n  0x40   //无效按键
 #define bks   0x30
-#define enter 0x31
+#define enter 0x31  //确认
 sbit P0_6 =P0^6;
 sbit P2_4 = P2^4;
 sbit SPK  = P1^7;
@@ -80,7 +83,7 @@ uchar code key_vl[] = {0,3,2,1,11,6,5,4,n,9,8,7,bks,0,enter,n,12};
 bit beep_flag =0;
 int beep_time=0;
 uchar step=0,P2_buf,P0_buf;
-uchar dis[4] ={0,0,0,0};
+uchar show_buffer[4] ={0,0,0,0};
 bit sec_ok =0;
 uint sec_cnt=0,key_scan=0;
 uchar setting_step;
@@ -90,7 +93,7 @@ bit setting_mode_flag=0;
 uchar key_get(void);
 
 main()
-{  uchar time[3]={0,0,0},key1,key2,key,time_buf[6];
+{  uchar time[3]={0,0,0},key1,key2,key,t_buffer[6];
    bit key_flag;
    P2_4 = 0;
 // inti mcu
@@ -100,14 +103,13 @@ main()
    TL2 = RCAP2L = 0x00;  //2.5ms
    TR2 = 1;
 
-   display_a(0,0);
+   display_a(0,0);  //可恶的静态数码管
   while(1)
   { 
     P2_4=0;
 		if(sec_ok)
     { sec_ok = 0;
-			if(!setting_mode_flag)
-			display_a(time[2]%10,time[2]/10);
+			
       time[2]++;
       if(time[2]==60)
           { time[2] = 0;
@@ -117,12 +119,14 @@ main()
               { time[1] = 0;
                 time[0]++;
                 if(time[0]==24) time[0] =0;
-               if(!setting_mode_flag) {dis[2] = time[0]/10;
-													dis[3] = time[0]%10;}  
+               if(!setting_mode_flag) {show_buffer[2] = time[0]/10;
+													show_buffer[3] = time[0]%10;}  
               }
-           if(!setting_mode_flag){dis[0] = time[1]/10;
-                        dis[1] = time[1]%10;}              
+           if(!setting_mode_flag){show_buffer[0] = time[1]/10;
+                        show_buffer[1] = time[1]%10;}              
            }
+				if(!setting_mode_flag)
+			display_a(time[2]%10,time[2]/10);
     }        
  // key press1--read key 
    key = 0;
@@ -158,7 +162,7 @@ main()
                    case 7:
                    case 8:
                    case 9:if(setting_mode_flag)
-                           {time_buf[setting_step] = key;
+                           {t_buffer[setting_step] = key;
                             setting_step++;
                             if(setting_step>=6)setting_step=0;
                            }
@@ -171,20 +175,20 @@ main()
                    case enter: if(!setting_mode_flag){ 
 																		setting_mode_flag =1;
                                    setting_step = 0;
-                                   time_buf[4] = time[0]/10;
-                                   time_buf[5] = time[0]%10;
-                                   time_buf[2] = time[1]/10;
-                                   time_buf[3] = time[1]%10;
-                                   time_buf[0] = time[2]/10;
-                                   time_buf[1] = time[2]%10; 
+                                   t_buffer[4] = time[0]/10;
+                                   t_buffer[5] = time[0]%10;
+                                   t_buffer[2] = time[1]/10;
+                                   t_buffer[3] = time[1]%10;
+                                   t_buffer[0] = time[2]/10;
+                                   t_buffer[1] = time[2]%10; 
                                                         
                                             } break;
                             
 									case 11:    if(setting_mode_flag )      {   
-																		if( time_buf[4]*10+time_buf[5]<24 && time_buf[2]*10+time_buf[3]<60 &&  time_buf[0]*10+time_buf[1]<60){
-                                    time[0] = time_buf[4]*10+time_buf[5];
-                                    time[1] = time_buf[2]*10+time_buf[3];
-                                    time[2] = time_buf[0]*10+time_buf[1];
+																		if( t_buffer[4]*10+t_buffer[5]<24 && t_buffer[2]*10+t_buffer[3]<60 &&  t_buffer[0]*10+t_buffer[1]<60){
+                                    time[0] = t_buffer[4]*10+t_buffer[5];
+                                    time[1] = t_buffer[2]*10+t_buffer[3];
+                                    time[2] = t_buffer[0]*10+t_buffer[1];
 																		setting_mode_flag = 0;}
 																		else{
 																			if(!beep_flag)
@@ -194,37 +198,37 @@ main()
 																												}
                                   
                                  break;
-									 case 12:  if(setting_mode_flag ){setting_mode_flag=0;dis[2] = time[0]/10;
-																		dis[3] = time[0]%10;
-																		dis[0] = time[1]/10;
-																		dis[1] = time[1]%10;}break;
+									 case 12:  if(setting_mode_flag ){setting_mode_flag=0;show_buffer[2] = time[0]/10;
+																		show_buffer[3] = time[0]%10;
+																		show_buffer[0] = time[1]/10;
+																		show_buffer[1] = time[1]%10;}break;
                    default:break;
                  }  
       if(setting_step>=2)
-										display_a(time_buf[1],time_buf[0]);
-			if(setting_mode_flag){dis[0] = time_buf[2];
-                   dis[1] = time_buf[3];
-                   dis[2] = time_buf[4];
-                   dis[3] = time_buf[5];
+										display_a(t_buffer[1],t_buffer[0]);
+			if(setting_mode_flag){show_buffer[0] = t_buffer[2];
+                   show_buffer[1] = t_buffer[3];
+                   show_buffer[2] = t_buffer[4];
+                   show_buffer[3] = t_buffer[5];
 			}
       
   } 
 	if(setting_mode_flag && setting_step<2){ 
                      
 										if(setting_step==0){
-											if(sec_cnt==200){display_a(time_buf[1],time_buf[0]); }
+											if(sec_cnt==200){display_a(t_buffer[1],t_buffer[0]); }
 											
-											if(sec_cnt==0){display_a(time_buf[1],16);}
+											if(sec_cnt==0){display_a(t_buffer[1],16);}
 										}
 										if(setting_step==1){
-											if(sec_cnt==200){display_a(time_buf[1],time_buf[0]); }
-											if(sec_cnt==0){display_a(16,time_buf[0]);}
+											if(sec_cnt==200){display_a(t_buffer[1],t_buffer[0]); }
+											if(sec_cnt==0){display_a(16,t_buffer[0]);}
 											
 										}
-                   dis[0] = time_buf[2];
-                   dis[1] = time_buf[3];
-                   dis[2] = time_buf[4];
-                   dis[3] = time_buf[5];
+                   show_buffer[0] = t_buffer[2];
+                   show_buffer[1] = t_buffer[3];
+                   show_buffer[2] = t_buffer[4];
+                   show_buffer[3] = t_buffer[5];
                   }
 	if(beep_flag){
 			if(sec_cnt==66 || sec_cnt==198 || sec_cnt==334){
@@ -255,10 +259,10 @@ void tct2(void) interrupt 5
    step++;
    if(step>=4) step = 0;
     cs8 = 1;
-		if(!setting_mode_flag)P0 = P0_buf= tablek[dis[step]];
+		if(!setting_mode_flag)P0 = P0_buf= tablek[show_buffer[step]];
 	 else{
 		if(step!=setting_step-2 || sec_cnt>=200)
-     P0 = P0_buf= tablek[dis[step]];
+     P0 = P0_buf= tablek[show_buffer[step]];
     else 
 			P0 = P0_buf= tablek[16];}
     if(step==1) P0 =P0_buf= P0 | 0x80;
