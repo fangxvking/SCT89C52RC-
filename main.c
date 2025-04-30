@@ -1,0 +1,283 @@
+#include<reg52.h>
+
+#define uchar unsigned char
+#define uint  unsigned int 
+#define n  0x40
+#define bks   0x30
+#define enter 0x31
+sbit P0_6 =P0^6;
+sbit P2_4 = P2^4;
+sbit SPK  = P1^7;
+sbit cs8  = P1^0;
+sbit IOC  = P2^3;
+sbit S_DAT = P0^6;
+sbit S_SCL = P0^5;
+sbit S_STB = P3^4;
+sbit cs9 = P1^4;
+
+uchar code tablea[]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,
+         0x80,0x90,0x88,0x83,0xc6,0xa1,0x86,0x8e,0Xff};
+uchar code tablek[]={0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d
+,0x07,0x7f,0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71,0x00};
+uchar code key_vl[] = {0,3,2,1,11,6,5,4,n,9,8,7,bks,0,enter,n,12};
+bit beep_flag =0;
+int beep_time=0;
+uchar step=0,P2_buf,P0_buf;
+uchar dis[4] ={0,0,0,0};
+bit sec_ok =0;
+uint sec_cnt=0,key_scan=0;
+uchar setting_step;
+void delay(unsigned int cnt);
+void display_a(uchar dt1,uchar dt2);
+bit setting_mode_flag=0;
+uchar key_get(void);
+
+main()
+{  uchar time[3]={0,0,0},key1,key2,key,time_buf[6];
+   bit key_flag;
+   P2_4 = 0;
+// inti mcu
+   IE = 0xA0;
+   
+   TH2 = RCAP2H = 0xf7;
+   TL2 = RCAP2L = 0x00;  //2.5ms
+   TR2 = 1;
+
+   display_a(0,0);
+  while(1)
+  { 
+    P2_4=0;
+		if(sec_ok)
+    { sec_ok = 0;
+			if(!setting_mode_flag)
+			display_a(time[2]%10,time[2]/10);
+      time[2]++;
+      if(time[2]==60)
+          { time[2] = 0;
+						
+            time[1]++;
+            if(time[1]==60)
+              { time[1] = 0;
+                time[0]++;
+                if(time[0]==24) time[0] =0;
+               if(!setting_mode_flag) {dis[2] = time[0]/10;
+													dis[3] = time[0]%10;}  
+              }
+           if(!setting_mode_flag){dis[0] = time[1]/10;
+                        dis[1] = time[1]%10;}              
+           }
+    }        
+ // key press1--read key 
+   key = 0;
+  if(key_scan>=21)
+  {key_scan=0;
+  
+   key1 =  key_get();
+   delay(300);
+   key2 =  key_get();
+   if(key1==key2)
+    { if(key1==0) key_flag = 0;
+      else 
+       { if(!key_flag)
+           {key_flag = 1;
+            if(!beep_flag)
+						 key = 1; 
+            SPK = 0;
+						if(beep_flag)
+					beep_flag=0;
+            delay(3000);
+            SPK = 1;               
+           } }}} 
+ // key press
+  if(key)
+  { key = key_vl[key1];
+      switch(key){ case 0:
+                   case 1:
+                   case 2:
+                   case 3:
+                   case 4:
+                   case 5:
+                   case 6:
+                   case 7:
+                   case 8:
+                   case 9:if(setting_mode_flag)
+                           {time_buf[setting_step] = key;
+                            setting_step++;
+                            if(setting_step>=6)setting_step=0;
+                           }
+                          break;
+                   case bks:if(setting_mode_flag)
+                            {if(setting_step==0) setting_step=5;
+                             else setting_step--;
+                            }
+                          break;
+                   case enter: if(!setting_mode_flag){ 
+																		setting_mode_flag =1;
+                                   setting_step = 0;
+                                   time_buf[4] = time[0]/10;
+                                   time_buf[5] = time[0]%10;
+                                   time_buf[2] = time[1]/10;
+                                   time_buf[3] = time[1]%10;
+                                   time_buf[0] = time[2]/10;
+                                   time_buf[1] = time[2]%10; 
+                                                        
+                                            } break;
+                            
+									case 11:    if(setting_mode_flag )      {   
+																		if( time_buf[4]*10+time_buf[5]<24 && time_buf[2]*10+time_buf[3]<60 &&  time_buf[0]*10+time_buf[1]<60){
+                                    time[0] = time_buf[4]*10+time_buf[5];
+                                    time[1] = time_buf[2]*10+time_buf[3];
+                                    time[2] = time_buf[0]*10+time_buf[1];
+																		setting_mode_flag = 0;}
+																		else{
+																			if(!beep_flag)
+																			beep_flag=1;
+																		}
+																												
+																												}
+                                  
+                                 break;
+									 case 12:  if(setting_mode_flag ){setting_mode_flag=0;dis[2] = time[0]/10;
+																		dis[3] = time[0]%10;
+																		dis[0] = time[1]/10;
+																		dis[1] = time[1]%10;}break;
+                   default:break;
+                 }  
+      if(setting_step>=2)
+										display_a(time_buf[1],time_buf[0]);
+			if(setting_mode_flag){dis[0] = time_buf[2];
+                   dis[1] = time_buf[3];
+                   dis[2] = time_buf[4];
+                   dis[3] = time_buf[5];
+			}
+      
+  } 
+	if(setting_mode_flag && setting_step<2){ 
+                     
+										if(setting_step==0){
+											if(sec_cnt==200){display_a(time_buf[1],time_buf[0]); }
+											
+											if(sec_cnt==0){display_a(time_buf[1],16);}
+										}
+										if(setting_step==1){
+											if(sec_cnt==200){display_a(time_buf[1],time_buf[0]); }
+											if(sec_cnt==0){display_a(16,time_buf[0]);}
+											
+										}
+                   dis[0] = time_buf[2];
+                   dis[1] = time_buf[3];
+                   dis[2] = time_buf[4];
+                   dis[3] = time_buf[5];
+                  }
+	if(beep_flag){
+			if(sec_cnt==66 || sec_cnt==198 || sec_cnt==334){
+					SPK = 0;
+				
+				P2_4=1;
+				P0=0xBF;
+				P2_4=0;
+				delay(2000);
+				P2_4=1;
+				P0=0xFF;
+				P2_4=0;
+				SPK = 1;
+				beep_time++;
+			}
+
+			if(beep_time==10){beep_flag=0;beep_time=0;}
+			
+	}P2_4=0;
+  }
+}
+void tct2(void) interrupt 5
+{   TF2=0 ;
+   key_scan++;
+   sec_cnt++;
+   if(sec_cnt>=400){sec_cnt=0;sec_ok=1;} 
+   
+   step++;
+   if(step>=4) step = 0;
+    cs8 = 1;
+		if(!setting_mode_flag)P0 = P0_buf= tablek[dis[step]];
+	 else{
+		if(step!=setting_step-2 || sec_cnt>=200)
+     P0 = P0_buf= tablek[dis[step]];
+    else 
+			P0 = P0_buf= tablek[16];}
+    if(step==1) P0 =P0_buf= P0 | 0x80;
+    IOC = 1;
+    IOC = 0;
+    P2= P2_buf = (P2 & 0x1f) | 0x80| (step<<5);
+    cs8 = 0;
+   
+}
+
+
+void delay(unsigned int cnt)
+{unsigned int i;
+  for(i=0;i<=cnt;i++);
+}
+
+void display_a(uchar dt1,uchar dt2)
+{uint dis_dt;
+ uchar i;
+ ET2 =0 ;
+ cs8 = 1;    
+ dis_dt = (tablea[dt1] & 0x7f)*256+tablea[dt2];
+ 
+ IOC = 1;
+ P2 = (P2 & 0x1f) | 0x40; //74hc245 ok 
+
+ S_STB = 0;
+ for(i=0;i<16;i++)
+ { S_SCL = 0;
+   if(dis_dt & 0x8000) S_DAT = 1;
+   else                S_DAT = 0;
+   S_SCL = 1;
+   dis_dt <<= 1;     
+ }
+ S_SCL = 0;
+ S_STB = 1;
+ S_STB = 0;
+ P2 = P2_buf;
+ P0 = P0_buf;
+ IOC = 1;
+ IOC = 0;
+ cs8 = 0; 
+ ET2 =1;
+}
+
+uchar key_get(void)
+{ uchar i,key;
+  
+   cs8 = 1; //  573 oe  high
+   P2 = (P2 & 0x1f) | 0x80; //cs4
+   P0 = 0xff;
+   cs9 = 0;
+   key = P0;
+   cs9 = 1;
+   
+   if(key != 0xff)
+   {for(i=0;i<8;i++)
+       {if(!(key&0x01)) {P2=P2_buf;cs8=0;return i+9;}
+        key >>= 1;
+       }
+   }
+   else
+   { P2 = (P2 & 0x1f) | 0xa0; //cs5
+     P0 = 0xff;
+     cs9 = 0;
+     key = P0;
+     cs9 = 1;
+     
+     if(key != 0xff)
+     {for(i=0;i<8;i++)
+       {if(!(key&0x01)) {P2=P2_buf;cs8=0;return i+1;}
+        key >>= 1;
+       }
+      } 
+     else {P2=P2_buf;cs8=0;return 0;}     
+   }
+
+  {P2=P2_buf;cs8=0;return 0;}
+}
